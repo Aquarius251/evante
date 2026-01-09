@@ -1,30 +1,44 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>3D</title>
   <style>
     html, body { margin:0; height:100%; overflow:hidden; background:#000; }
     canvas { display:block; }
   </style>
+
+  <!-- ✅ Import map fixes "three" specifier for examples/jsm modules -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/examples/jsm/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
 </head>
 <body>
+
 <script type="module">
-  // ✅ CDN imports (works on GitHub Pages / FTP)
-  import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js";
-  import { OrbitControls } from "https://unpkg.com/three@0.160.0/examples/jsm/controls/OrbitControls.js";
-  import { GLTFLoader } from "https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js";
-  import { RGBELoader } from "https://unpkg.com/three@0.160.0/examples/jsm/loaders/RGBELoader.js";
+  import * as THREE from "three";
+  import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+  import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+  import { RGBELoader } from "three/examples/jsm/loaders/RGBELoader.js";
 
   const MODEL_URL = "./motyl-tripple-chain-bigger-export.glb";
 
+  // Scene
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x000000);
 
+  // Camera
   const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.01, 100000);
   camera.position.set(2, 2, 3);
 
-  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  // Renderer
+  const renderer = new THREE.WebGLRenderer({ antialias:true });
   renderer.setSize(innerWidth, innerHeight);
   renderer.setPixelRatio(devicePixelRatio);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -32,10 +46,13 @@
   renderer.toneMappingExposure = 1.15;
   document.body.appendChild(renderer.domElement);
 
+  // Controls
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
+  controls.dampingFactor = 0.06;
+  controls.screenSpacePanning = true;
 
-  // Lights
+  // Lights (strong enough even without HDRI)
   scene.add(new THREE.AmbientLight(0xffffff, 0.35));
   const key = new THREE.DirectionalLight(0xffffff, 2.6);
   key.position.set(6, 10, 6);
@@ -44,7 +61,7 @@
   fill.position.set(-6, 3, -6);
   scene.add(fill);
 
-  // HDRI reflections (optional)
+  // HDRI environment for reflections (optional but nice)
   const HDR_URL = "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/studio_small_09_1k.hdr";
   const pmrem = new THREE.PMREMGenerator(renderer);
   pmrem.compileEquirectangularShader();
@@ -55,7 +72,7 @@
     pmrem.dispose();
   });
 
-  // Gold metallic
+  // Gold metallic material
   function gold() {
     return new THREE.MeshStandardMaterial({
       color: new THREE.Color("#d4af37"),
@@ -65,6 +82,7 @@
     });
   }
 
+  // Frame model so it’s visible
   function frame(obj) {
     const box = new THREE.Box3().setFromObject(obj);
     const size = box.getSize(new THREE.Vector3());
@@ -84,7 +102,7 @@
     controls.update();
   }
 
-  // Load GLB
+  // Load model
   const loader = new GLTFLoader();
   loader.load(
     MODEL_URL,
@@ -92,26 +110,29 @@
       const model = gltf.scene;
       scene.add(model);
 
+      // Force gold on everything
       model.traverse((o) => {
         if (o.isMesh) o.material = gold();
       });
 
       frame(model);
-      console.log("✅ Loaded model");
+      console.log("✅ Model loaded");
     },
     undefined,
     (err) => {
-      console.error("❌ Failed to load GLB:", err);
-      alert("Failed to load GLB. Check console.");
+      console.error("❌ GLB load failed:", err);
+      alert("Model failed to load. Check console (F12).");
     }
   );
 
+  // Resize
   addEventListener("resize", () => {
     camera.aspect = innerWidth / innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(innerWidth, innerHeight);
   });
 
+  // Render loop
   function animate() {
     requestAnimationFrame(animate);
     controls.update();
@@ -119,5 +140,6 @@
   }
   animate();
 </script>
+
 </body>
 </html>
