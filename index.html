@@ -1,16 +1,16 @@
 <!doctype html>
-<html lang="en">
+<html>
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>3D</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
-    html, body { margin:0; height:100%; overflow:hidden; background:#111; }
+    html, body { margin:0; height:100%; overflow:hidden; background:#000; }
     canvas { display:block; }
   </style>
 </head>
 <body>
 <script type="module">
+  // ✅ CDN imports (works on GitHub Pages / FTP)
   import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js";
   import { OrbitControls } from "https://unpkg.com/three@0.160.0/examples/jsm/controls/OrbitControls.js";
   import { GLTFLoader } from "https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js";
@@ -18,16 +18,13 @@
 
   const MODEL_URL = "./motyl-tripple-chain-bigger-export.glb";
 
-  // Scene
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x222222); // not black -> easier to see
+  scene.background = new THREE.Color(0x000000);
 
-  // Camera
-  const camera = new THREE.PerspectiveCamera(55, innerWidth/innerHeight, 0.01, 20000);
+  const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.01, 100000);
   camera.position.set(2, 2, 3);
 
-  // Renderer
-  const renderer = new THREE.WebGLRenderer({ antialias:true });
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(innerWidth, innerHeight);
   renderer.setPixelRatio(devicePixelRatio);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -35,116 +32,87 @@
   renderer.toneMappingExposure = 1.15;
   document.body.appendChild(renderer.domElement);
 
-  // Controls
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
-  controls.dampingFactor = 0.06;
 
-  // ✅ DEBUG HELPERS (you can remove later)
-  scene.add(new THREE.AxesHelper(1.5));
-  scene.add(new THREE.GridHelper(10, 10));
-
-  // ✅ STRONG LIGHTS (even without HDRI this should show something)
-  scene.add(new THREE.AmbientLight(0xffffff, 0.4));
-
-  const key = new THREE.DirectionalLight(0xffffff, 2.5);
-  key.position.set(5, 10, 7);
+  // Lights
+  scene.add(new THREE.AmbientLight(0xffffff, 0.35));
+  const key = new THREE.DirectionalLight(0xffffff, 2.6);
+  key.position.set(6, 10, 6);
   scene.add(key);
-
   const fill = new THREE.DirectionalLight(0xffffff, 1.2);
-  fill.position.set(-6, 3, -5);
+  fill.position.set(-6, 3, -6);
   scene.add(fill);
 
-  const rim = new THREE.DirectionalLight(0xffffff, 1.0);
-  rim.position.set(0, 6, -10);
-  scene.add(rim);
-
-  // HDRI reflections (optional but nice)
+  // HDRI reflections (optional)
   const HDR_URL = "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/studio_small_09_1k.hdr";
   const pmrem = new THREE.PMREMGenerator(renderer);
   pmrem.compileEquirectangularShader();
+  new RGBELoader().load(HDR_URL, (hdr) => {
+    const env = pmrem.fromEquirectangular(hdr).texture;
+    scene.environment = env;
+    hdr.dispose();
+    pmrem.dispose();
+  });
 
-  new RGBELoader()
-    .setDataType(THREE.FloatType)
-    .load(HDR_URL, (hdr) => {
-      const env = pmrem.fromEquirectangular(hdr).texture;
-      scene.environment = env;
-      hdr.dispose();
-      pmrem.dispose();
-      console.log("✅ HDRI loaded");
-    }, undefined, (e) => console.warn("⚠️ HDRI failed", e));
-
-  // Gold material
+  // Gold metallic
   function gold() {
     return new THREE.MeshStandardMaterial({
       color: new THREE.Color("#d4af37"),
       metalness: 1.0,
-      roughness: 0.18,
-      envMapIntensity: 2.0
+      roughness: 0.16,
+      envMapIntensity: 2.3
     });
   }
 
-  function frameObject(obj) {
+  function frame(obj) {
     const box = new THREE.Box3().setFromObject(obj);
     const size = box.getSize(new THREE.Vector3());
     const center = box.getCenter(new THREE.Vector3());
-
     const maxDim = Math.max(size.x, size.y, size.z);
-    const fov = camera.fov * (Math.PI / 180);
 
+    const fov = camera.fov * Math.PI / 180;
     let dist = maxDim / (2 * Math.tan(fov / 2));
     dist *= 1.6;
 
-    camera.position.set(center.x + dist * 0.6, center.y + dist * 0.35, center.z + dist);
+    camera.position.set(center.x + dist * 0.6, center.y + dist * 0.3, center.z + dist);
     camera.near = Math.max(maxDim / 1000, 0.001);
-    camera.far  = maxDim * 200;
+    camera.far = maxDim * 300;
     camera.updateProjectionMatrix();
 
     controls.target.copy(center);
     controls.update();
-
-    console.log("📦 Model bounds:", { size, center, maxDim });
   }
 
-  // Load model
+  // Load GLB
   const loader = new GLTFLoader();
-
-  console.log("➡️ Loading model:", MODEL_URL);
-
   loader.load(
     MODEL_URL,
     (gltf) => {
-      console.log("✅ Model loaded");
-
       const model = gltf.scene;
       scene.add(model);
 
-      model.traverse(o => {
-        if (o.isMesh) {
-          o.material = gold();
-          o.material.needsUpdate = true;
-        }
+      model.traverse((o) => {
+        if (o.isMesh) o.material = gold();
       });
 
-      frameObject(model);
+      frame(model);
+      console.log("✅ Loaded model");
     },
     undefined,
     (err) => {
-      console.error("❌ FAILED to load GLB:", MODEL_URL);
-      console.error(err);
-      alert("Model failed to load. Press F12 → Console to see the error.");
+      console.error("❌ Failed to load GLB:", err);
+      alert("Failed to load GLB. Check console.");
     }
   );
 
-  // Resize
   addEventListener("resize", () => {
-    camera.aspect = innerWidth/innerHeight;
+    camera.aspect = innerWidth / innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(innerWidth, innerHeight);
   });
 
-  // Render
-  function animate(){
+  function animate() {
     requestAnimationFrame(animate);
     controls.update();
     renderer.render(scene, camera);
